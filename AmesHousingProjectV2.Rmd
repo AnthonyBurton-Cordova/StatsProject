@@ -1,0 +1,152 @@
+---
+title: "Ames_Housing_Data"
+author: "Thibeaux"
+date: "2023-04-04"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggplot2)
+library(GGally)
+```
+
+Load Data
+```{r}
+#Load Test Data
+test = read.csv('https://github.com/athibeaux/MSDS-DDS/raw/main/Project/test.csv', header = TRUE, fill = TRUE)
+
+#Load Train Data
+train = read.csv('https://github.com/athibeaux/MSDS-DDS/raw/main/Project/train.csv', header = TRUE, fill = NA)
+
+#Summary of Train Data
+summary(train)
+
+#Select Relevant Columns and Neighborhoods for Analysis Question 1
+C21 = train %>% select(GrLivArea,Neighborhood,SalePrice) %>% filter(Neighborhood == "NAmes" | Neighborhood == "Edwards" | Neighborhood == "BrkSide")
+
+C21$Neighborhood <- as.factor(C21$Neighborhood)
+summary(C21)
+
+#Check and Remove NA's
+sum(is.na(train$GrLIvArea))
+```
+
+Checking Assumptions 
+		Residual Plots 
+		Influential point analysis (Cook’s D and Leverage)
+		Make sure to address each assumption.
+
+#Addressing Assumptions (Linearity, Variance, Normality, and Independence)
+
+#Linearity
+```{r Linearity Assumption}
+# Without Lines
+C21 %>% ggplot(aes(GrLivArea, SalePrice, color = Neighborhood)) + geom_point() +
+  ggtitle("Square Footage of Living Areas vs. Sales Price")
+
+# With Lines for each Neighborhood
+C21 %>% ggplot(aes(GrLivArea, SalePrice, color = Neighborhood)) + geom_point() +
+  geom_smooth(method = "lm") + ggtitle("Square Footage of Living Areas vs. Sales Price")
+```
+
+# Normality
+```{r Normality Assumption}
+ggpairs(C21)
+
+# QQ Plot for Living Area Square Footage
+C21 %>% ggplot() + geom_qq(aes(sample = GrLivArea))
+
+# QQ Plot for Sale Price
+C21 %>% ggplot() + geom_qq(aes(sample = SalePrice))
+
+# Histogram for Sale Price
+C21 %>% ggplot() + geom_histogram(aes(x = SalePrice))
+
+# Log Transformation on GrLivArea
+C21$logLivArea = log(C21$GrLivArea)
+
+# QQ Plot for Log-Transformed Living Area Square Footage
+C21 %>% ggplot() + geom_qq(aes(sample = logLivArea))
+
+# Histogram for Living Area Square Footage
+C21 %>% ggplot() + geom_histogram(aes(x = GrLivArea))
+
+# Histogram for Log-Transformed Living Area Square Footage
+C21 %>% ggplot() + geom_histogram(aes(x = logLivArea))
+
+# Log Transformation on Sale Price
+C21$logprice = log(C21$SalePrice)
+
+# Histogram for Log-Transformed Living Area Square Footage
+C21 %>% ggplot() + geom_histogram(aes(x = logprice)) +
+  ggtitle("Distribution of log-transformed Sale Price")
+
+# QQ Plot for Log-Transformed Living Area Square Footage
+C21 %>% ggplot() + geom_qq(aes(sample = logprice)) + 
+  ggtitle("QQ Plot for Sale Price, log transformed") + 
+  ylab("Sale Price, log-transformed")
+```
+
+# Equal Variance
+```{r Equal Variance}
+# Non Transformed Data
+rd <- lm(SalePrice ~ GrLivArea, data = C21)
+g = rd$residuals
+m<-mean(g)
+std<-sqrt(var(g))
+hist(g, density=20, breaks=20, prob=TRUE, col="red",
+     xlab="Residuals",  
+     main="Residual Histogram with Normal Distribution")
+curve(dnorm(x, mean=m, sd=std), 
+      col="darkblue", lwd=2, add=TRUE, yaxt="n")
+
+plot(rd)
+
+# Notice cluster effect of residuals...
+
+# Linear-Log Model 
+
+log_rd <- lm(logprice ~ logLivArea, data = C21)
+log_g = log_rd$residuals
+log_m<-mean(log_g)
+log_std<-sqrt(var(log_g))
+hist(log_g, density=20, breaks=20, prob=TRUE, col="red",
+     xlab="Residuals",  
+     main="Residual Histogram with Normal Distribution")
+curve(dnorm(x, mean=log_m, sd=log_std), 
+      col="darkblue", lwd=2, add=TRUE, yaxt="n")
+
+plot(log_rd)
+
+
+```
+
+# Table of significance
+```{r Table of significance}
+
+#Sigtable1 using the Log of Living Area
+SigTab1 <- lm(formula = logprice  ~ logLivArea, data = C21)
+SigTab1
+summary(SigTab1)
+
+#Sigtable2 using the original Living Area
+SigTab2 <- lm(formula = SalePrice  ~ GrLivArea, data = C21)
+SigTab2
+summary(SigTab2)
+```
+
+# PRESS Statistic
+```{r Calculating the PRESS Statistic}
+
+#Get the residuals
+(r <- resid(log_rd))
+(pr <- r /(1 - lm.influence(log_rd)$hat))
+sum(r^2)
+sum(pr^2)
+summary(log_rd)$r.squared
+
+#Confidence intervals
+confint(log_rd, level = 0.95)
+```
